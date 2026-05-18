@@ -34,22 +34,12 @@ produce a fresh sample, or swap in real data with the same schema.
 - high-risk policy flagging above a claim amount threshold
 - loss ratio trend by year
 
-## Productionising
+## Next steps
 
-The analysis logic in the notebook needs to become an importable, testable
-package. Rough decomposition:
-
-- **ingestion** — load a CSV or database export, normalise date formats,
-  coerce types, deduplicate
-- **features** — compute loss ratios, apply the high-risk threshold; pure
-  functions, no I/O
-- **reporting** — aggregate by region/peril/year, produce the summary table
-  and charts
-
-Whether this runs as a scheduled batch job (e.g. triggered on each monthly
-export) or as a lightweight API that scores on demand is still open. Either
-way the core logic should be the same module, just with a different entry
-point wired around it.
+The analysis works, but it lives entirely in a notebook. The goal is to
+turn it into a service that underwriters can run on fresh monthly exports
+without touching any code — whether that ends up as a scheduled job or an
+API is still to be decided.
 
 ## Setup
 
