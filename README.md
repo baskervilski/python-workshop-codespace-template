@@ -1,76 +1,59 @@
-# Python Workshop — Insurance Claims Refactoring
+# Claims Loss Ratio Analysis
 
-A hands-on workshop for data scientists. You start with a messy but working
-notebook, and end with production-ready Python code.
+Exploratory analysis of insurance claims data across the Benelux, Germany,
+and France portfolio. The notebook produces loss ratio metrics by region and
+peril, and flags high-risk policies for review.
 
-## Repo layout
+The next step is to turn this into a deployable service — batch job or API,
+TBD — so underwriters can run it on fresh exports without opening a notebook.
 
-```
-data/
-  claims_sample.csv     synthetic claims dataset (20 000 rows)
-  generate_claims.py    script that produced the CSV — edit and re-run to regenerate
-notebooks/
-  claims_analysis.ipynb the notebook you will refactor
-requirements.txt        pandas, matplotlib, ruff
-```
+## Data
 
-## The dataset
-
-`claims_sample.csv` contains one row per insurance claim across eight regions
-in Belgium, the Netherlands, Germany, and France (2020–2024).
+`data/claims_sample.csv` — one row per claim, 2020–2024.
 
 | Column | Type | Notes |
 |---|---|---|
-| `policy_id` | string | format `POL-XXXXXX`; a policy can appear more than once |
-| `claim_date` | string | mostly ISO 8601; ~0.5 % are `DD/MM/YYYY` — intentional mess |
-| `peril` | string | fire, flood, theft, liability, storm, water_damage; ~1 % are `UNKNOWN` or blank |
+| `policy_id` | string | `POL-XXXXXX`; one policy can have multiple claims |
+| `claim_date` | string | ISO 8601; some legacy rows use `DD/MM/YYYY` |
+| `peril` | string | fire, flood, theft, liability, storm, water_damage |
 | `region` | string | BE-BRU, BE-VLG, BE-WAL, NL-NH, NL-ZH, DE-BAY, DE-NRW, FR-IDF |
-| `claim_amount` | float | log-normal, 500–500 000; ~3 % are missing |
-| `premium` | float | correlated with claim_amount, 200–5 000 |
-| `loss_year` | int | year extracted from claim_date — redundant, intentional |
+| `claim_amount` | float | log-normal distribution, 500–500 000; some values missing |
+| `premium` | float | 200–5 000 |
+| `loss_year` | int | year extracted from `claim_date` |
 
-## The notebook
+The CSV was generated with `data/generate_claims.py` (seed 42). Re-run it to
+produce a fresh sample, or swap in real data with the same schema.
 
-`claims_analysis.ipynb` is deliberately written as messy analyst code. It
-loads the CSV, cleans it (three times, copy-pasted), computes loss ratios
-(`claim_amount / premium`), plots average loss ratio per region, and flags
-high-risk policies. It runs end-to-end, but contains a catalogue of
-anti-patterns for participants to find and fix.
+## Notebook
 
-The workshop is **not** about exploration — the analysis logic is already
-correct. The goal is to take that logic and turn it into something that can
-be shipped.
+`notebooks/claims_analysis.ipynb` covers:
 
-## What we are building towards
+- data loading and cleaning (mixed date formats, missing amounts, unknown perils)
+- loss ratio computation (`claim_amount / premium`) per policy
+- average loss ratio aggregated by region, visualised as a bar chart
+- high-risk policy flagging above a claim amount threshold
+- loss ratio trend by year
 
-By the end of the workshop the notebook should be replaced by a small Python
-package with three responsibilities:
+## Productionising
 
-**1. Ingestion & cleaning** (`src/claims/io.py`)
-A `load_claims(path)` function that validates the file exists, parses mixed
-date formats, coerces types, drops true duplicates, and returns a clean
-`DataFrame`. No business logic, no side effects.
+The analysis logic in the notebook needs to become an importable, testable
+package. Rough decomposition:
 
-**2. Feature computation** (`src/claims/features.py`)
-Pure functions — `loss_ratio(df)`, `flag_high_risk(df, threshold)` — that
-take a clean `DataFrame` and return a new one. Threshold and region lists are
-module-level constants, not magic numbers buried in conditions.
+- **ingestion** — load a CSV or database export, normalise date formats,
+  coerce types, deduplicate
+- **features** — compute loss ratios, apply the high-risk threshold; pure
+  functions, no I/O
+- **reporting** — aggregate by region/peril/year, produce the summary table
+  and charts
 
-**3. Reporting** (`src/claims/report.py`)
-A `summary_by_region(df)` function that returns the aggregated table (using
-`groupby`, not a manual loop), and a `plot_loss_ratios(summary)` function
-that produces the bar chart. Plotting is separated from data work.
+Whether this runs as a scheduled batch job (e.g. triggered on each monthly
+export) or as a lightweight API that scores on demand is still open. Either
+way the core logic should be the same module, just with a different entry
+point wired around it.
 
-The package is imported by a thin `run.py` entry point (or a clean notebook)
-that wires the three pieces together. It can be called from a scheduled job,
-a CI pipeline, or a REST endpoint without modification.
-
-## Getting started
+## Setup
 
 ```bash
-# open in GitHub Codespaces — environment is pre-configured
-# or locally:
 pip install -r requirements.txt
-python data/generate_claims.py   # regenerate the CSV if needed
 jupyter notebook notebooks/claims_analysis.ipynb
 ```
